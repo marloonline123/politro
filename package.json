@@ -1,0 +1,28 @@
+{
+  "name": "instagram-food-lead-bot",
+  "version": "2.0.0",
+  "description": "Classify Instagram profiles as food businesses using AI + 2Captcha browser",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts"
+  },
+  "keywords": [
+    "instagram",
+    "food-business",
+    "classification",
+    "playwright"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "playwright": "^1.50.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
