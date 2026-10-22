@@ -39,6 +39,13 @@ export class Bot {
     process.exit(0);
   }
 
+  public async testAiConnection(): Promise<void> {
+    logger.info('='.repeat(60));
+    logger.info('  Instagram Food Business Classifier - AI Pre-flight Check');
+    logger.info('='.repeat(60));
+    await this.classifier.testConnection();
+  }
+
   public async run(options: BotRunOptions = {}): Promise<ProfileResult[]> {
     const inputFile = options.inputFile || this.config.defaultInputFile;
 
@@ -73,9 +80,18 @@ export class Bot {
     logger.info(`${toProcess.length} profiles to process (scraping concurrency: ${this.config.concurrency})`);
 
     // ========================================================
+    // Pre-flight: Test OpenRouter / AI connection before scraping
+    // ========================================================
+    if (toProcess.length > 0) {
+      logger.info('');
+      logger.info(`─── Pre-flight: Verifying AI connection (${this.config.aiModel}) ───`);
+      await this.classifier.testConnection();
+      logger.info('');
+    }
+
+    // ========================================================
     // Phase 1: Scrape all profiles
     // ========================================================
-    logger.info('');
     logger.info(`─── Phase 1: Scraping ${toProcess.length} profiles ───`);
 
     // Init browser if we have valid URLs to scrape

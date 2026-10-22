@@ -11,10 +11,17 @@ program
   .version('2.0.0')
   .option('-i, --input <path>', 'Path to profiles text file', 'profiles.txt')
   .option('-r, --resume', 'Resume from checkpoint (skip already processed)', false)
+  .option('-t, --test-ai', 'Test AI/OpenRouter connection and model readiness, then exit', false)
   .action(async (options) => {
     try {
       const config = loadConfig();
       const bot = new Bot(config);
+
+      if (options.testAi) {
+        await bot.testAiConnection();
+        process.exit(0);
+      }
+
       await bot.run({
         inputFile: options.input,
         resume: options.resume,

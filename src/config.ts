@@ -1,5 +1,13 @@
 import dotenv from "dotenv";
 import path from "path";
+import dns from "node:dns";
+
+// Prioritize IPv4 DNS resolution to avoid ETIMEDOUT / ENETUNREACH issues on networks with incomplete IPv6
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  // Ignored if unsupported
+}
 
 dotenv.config();
 
@@ -21,6 +29,7 @@ export interface BotConfig {
   aiBaseUrl: string;
   aiModel: string;
   aiApiKey: string;
+  aiProxy?: string;
 
   // Output
   outputDir: string;
@@ -58,8 +67,13 @@ export function loadConfig(overrides?: Partial<BotConfig>): BotConfig {
     maxPostsToInspect: parseInt(process.env.MAX_POSTS_TO_INSPECT || "6", 10),
 
     aiBaseUrl: process.env.AI_BASE_URL || "https://openrouter.ai/api/v1",
-    aiModel: process.env.AI_MODEL || "nvidia/nemotron-3-ultra-550b-a55b:free",
+    aiModel: process.env.AI_MODEL || "openrouter/free",
     aiApiKey,
+    aiProxy:
+      process.env.AI_PROXY ||
+      process.env.HTTPS_PROXY ||
+      process.env.HTTP_PROXY ||
+      "",
 
     outputDir,
     checkpointFile:

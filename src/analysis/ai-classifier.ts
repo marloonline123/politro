@@ -119,6 +119,74 @@ NOT food: catering, blogger/influencer, chef (personal), hiring/recruitment, del
     return result;
   }
 
+  /**
+   * Pre-flight health check that tests the OpenRouter / AI connection before starting the bot.
+   * 1. Checks API key validity via /auth/key (if OpenRouter).
+   * 2. Tests model responsiveness with a test prompt.
+   * Throws an Error with actionable diagnostics if the test fails.
+   */
+  public async testConnection(): Promise<void> {
+    const isLocalOrCustom = !this.config.aiBaseUrl.includes('openrouter.ai');
+    logger.info(`[Pre-flight] Checking AI connection to ${isLocalOrCustom ? this.config.aiBaseUrl : 'OpenRouter'}...`);
+    logger.info(`[Pre-flight] Target Model: ${this.config.aiModel}`);
+
+    // Step 1: Check OpenRouter API key validity
+    if (!isLocalOrCustom) {
+      const authUrl = `${this.config.aiBaseUrl.replace(/\/+$/, '')}/auth/key`;
+      try {
+        const authRes = await fetch(authUrl, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${this.config.aiApiKey}`,
+            'HTTP-Referer': 'https://github.com/instagram-lead-bot',
+            'X-Title': 'Instagram Food Lead Bot',
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (authRes.status === 401 || authRes.status === 403) {
+          throw new Error(`Invalid OpenRouter API Key (HTTP ${authRes.status}). Please check OPENROUTER_API_KEY in .env.`);
+        }
+
+        if (authRes.ok) {
+          const authData: any = await authRes.json();
+          const label = authData?.data?.label ? ` (Key: ${authData.data.label})` : '';
+          const usage = authData?.data?.usage !== undefined ? ` | Usage: $${authData.data.usage}` : '';
+          const limit = authData?.data?.limit !== undefined ? ` | Limit: $${authData.data.limit}` : '';
+          logger.success(`[Pre-flight] OpenRouter API key is valid!${label}${usage}${limit}`);
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('Invalid OpenRouter API Key')) {
+          throw err;
+        }
+        const detail = describeError(err);
+        logger.warn(`[Pre-flight] Could not complete /auth/key check: ${detail}`);
+      }
+    }
+
+    // Step 2: Test model responsiveness
+    logger.info(`[Pre-flight] Testing model "${this.config.aiModel}" response...`);
+    const testMessages = [
+      { role: 'user', content: 'Respond with the word OK.' }
+    ];
+
+    try {
+      const response = await this.callApi(testMessages);
+      logger.success(`[Pre-flight] AI connection SUCCESSFUL! Model replied: "${response.trim().slice(0, 40)}"`);
+    } catch (err: any) {
+      const detail = describeError(err);
+      logger.error(`[Pre-flight] AI connection test FAILED: ${detail}`);
+      logger.error('------------------------------------------------------------');
+      logger.error('Troubleshooting tips:');
+      logger.error('1. Check if your OPENROUTER_API_KEY in .env is valid.');
+      logger.error(`2. Check if the model "${this.config.aiModel}" is currently available (see free_models.txt).`);
+      logger.error('3. Check your internet/VPN connection (if OpenRouter is blocked, enable a VPN or proxy).');
+      logger.error('4. You can test your AI connection without scraping using: npm run start -- --test-ai');
+      logger.error('------------------------------------------------------------');
+      throw new Error(`AI pre-flight check failed: ${detail}`);
+    }
+  }
+
   private async callApi(messages: Array<{ role: string; content: string }>): Promise<string> {
     const url = `${this.config.aiBaseUrl.replace(/\/+$/, '')}/chat/completions`;
 
@@ -147,7 +215,12 @@ NOT food: catering, blogger/influencer, chef (personal), hiring/recruitment, del
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`AI API HTTP ${res.status}: ${text}`);
+      let errMsg = text;
+      try {
+        const errJson = JSON.parse(text);
+        errMsg = errJson.error?.message || errJson.message || text;
+      } catch {}
+      throw new Error(`AI API HTTP ${res.status}: ${errMsg}`);
     }
 
     const data: any = await res.json();
